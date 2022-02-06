@@ -1,158 +1,178 @@
-use std::HashMap;
-use crate::fee_growth::*;
+use super::fee::Fee;
+use anyhow::{anyhow, Result};
 
-pub type Tick = i32; // lol you suck
-pub type SecondsPerLiquidity = float128; // this is wrong too
+/// Tick datatype. In the smart contracts it's an i24. TODO: fix the datatypes
+pub type Tick = i32;
+/// SecondsPerLiquidity datatype. uint160 in the contracts with X128 formatting. TODO: fix the datatypes
+pub type SecondsPerLiquidity = float128;
 
+const MIN_TICK: i32 = -887272;
+const MAX_TICK: i32 = -MIN_TICK;
+
+/// One tick's data, as stored in the tick table. For all sorts of dynamic programming goodies.
 pub struct TickData {
-    liquidity_net: i128,
+    /// the total position liquidity that references this tick
     liquidity_gross: u128,
-    fee_growth_outside: FeeGrowth,
-    seconds_outside: u32,
+    /// amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
+    liquidity_net: i128,
+    /// fee growth per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+    /// only has relative meaning, not absolute — the value depends on when the tick is initialized
+    fee_growth_outside: Fee,
+    /// the cumulative tick value on the other side of the tick
     tick_cumulative_outside: u128,
+    /// the seconds per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+    /// only has relative meaning, not absolute — the value depends on when the tick is initialized
     seconds_per_liquidity_outside: SecondsOutside,
+    /// the seconds spent on the other side of the tick (relative to the current tick)
+    /// only has relative meaning, not absolute — the value depends on when the tick is initialized
+    seconds_outside: u32,
+    // true iff the tick is initialized, i.e. the value is exactly equivalent to the expression liquidityGross != 0
+    // these 8 bits are set to prevent fresh sstores when crossing newly initialized ticks
+    initialized: bool,
 }
-/*
-/// TODO write me
-/// @notice Derives max liquidity per tick from given tick spacing
-/// @dev Executed within the pool constructor
-/// @param tickSpacing The amount of required tick separation, realized in multiples of `tickSpacing`
-///     e.g., a tickSpacing of 3 requires ticks to be initialized every 3rd tick i.e., ..., -6, -3, 0, 3, 6, ...
-/// @return The max liquidity per tick
-function tickSpacingToMaxLiquidityPerTick(int24 tickSpacing) internal pure returns (uint128) {
-int24 minTick = (TickMath.MIN_TICK / tickSpacing) * tickSpacing;
-int24 maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
-uint24 numTicks = uint24((maxTick - minTick) / tickSpacing) + 1;
-return type(uint128).max / numTicks;
-}*/
 
-// TODO fix the docs here lol
-/// @notice Retrieves fee growth data
-/// @param self The mapping containing all tick information for initialized ticks
-/// @param tickLower The lower tick boundary of the position
-/// @param tickUpper The upper tick boundary of the position
-/// @param tickCurrent The current tick
-/// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
-/// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
-/// @return feeGrowthInside0X128 The all-time fee growth in token0, per unit of liquidity, inside the position's tick boundaries
-/// @return feeGrowthInside1X128 The all-time fee growth in token1, per unit of liquidity, inside the position's tick boundaries
+/// Derives max liquidity per tick from given tick spacing. Executed within the pool constructor
+/// # Arguments
+///
+/// * `tickSpacing` The amount of required tick separation, realized in multiples of `tickSpacing`
+///     e.g., a tickSpacing of 3 requires ticks to be initialized every 3rd tick i.e., ..., -6, -3, 0, 3, 6, ...
+/// returns the max liquidity per tick
+/// TODO: this may be incorrect due to int type things! check it.
+fn tick_spacing_to_max_liquidity_per_tick(tick_spacing: i32) -> u128 {
+    let min_tick = (MIN_TICK / tick_spacing) * tick_spacing;
+    let max_tick = (MAX_TICK / tick_spacing) * tick_spacing;
+    let num_ticks = ((max_tick - min_tick) / tick_spacing) + 1;
+    return u128.MAX_INT / num_ticks;
+}
 
 impl TickTable {
-    fn get_fee_growth_inside(&self,
-    tick_lower: Tick,
-    tick_upper: Tick,
-    tick_current: Tick,
-    fee_growth_global: FeeGrowth,
+    /// Retrieves fee growth data
+    /// # Arguments
+    ///
+    /// * `tick_lower` The lower tick boundary of the position
+    /// * `tick_upper` The upper tick boundary of the position
+    /// * `tick_current` The current tick
+    /// * `fee_growth_global` The all-time global fee growth, per unit of liquidity, in token0 and token1
+    ///
+    /// returns the all-time fee growth in token0 and token1, per unit of liquidity, inside the position's tick boundaries
+    fn get_fee_growth_inside(
+        &self,
+        tick_lower: Tick,
+        tick_upper: Tick,
+        tick_current: Tick,
+        fee_growth_global: Fee,
     ) -> FeeGrowth {
         let lower_data = self.get(tick_lower);
         let upper_data = self.get(tick_upper);
 
-// calculate fee growth below
-    let fee_growth_below = if (tick_current >= tick_lower) {
-        lower_data.fee_growth_outside
-    } else {
-        fee_growth_global - lower_data.fee_growth_outside
-    };
+        // calculate fee growth below
+        let fee_growth_below = if tick_current >= tick_lower {
+            lower_data.fee_growth_outside
+        } else {
+            fee_growth_global - lower_data.fee_growth_outside
+        };
 
-    // calculate fee growth above
-    let fee_growth_above = if (tickCurrent < tickUpper) {
-        upper_data.fee_growth_outside
-    } else {
-        fee_growth_global - upper_data.fee_growth_outside
-    };
-    fee_growth_global - fee_growth_below - fee_growth_above
-
+        // calculate fee growth above
+        let fee_growth_above = if tickCurrent < tickUpper {
+            upper_data.fee_growth_outside
+        } else {
+            fee_growth_global - upper_data.fee_growth_outside
+        };
+        fee_growth_global - fee_growth_below - fee_growth_above
     }
-    // TODO update these parameters :)
-/// @notice Updates a tick and returns true if the tick was flipped from initialized to uninitialized, or vice versa
-/// @param self The mapping containing all tick information for initialized ticks
-/// @param tick The tick that will be updated
-/// @param tickCurrent The current tick
-/// @param liquidityDelta A new amount of liquidity to be added (subtracted) when tick is crossed from left to right (right to left)
-/// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
-/// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
-/// @param secondsPerLiquidityCumulativeX128 The all-time seconds per max(1, liquidity) of the pool
-/// @param tickCumulative The tick * time elapsed since the pool was first initialized
-/// @param time The current block timestamp cast to a uint32
-/// @param upper true for updating a position's upper tick, or false for updating a position's lower tick
-/// @param maxLiquidity The maximum liquidity allocation for a single tick
-/// @return flipped Whether the tick was flipped from initialized to uninitialized, or vice versa
-fn update(
-&self,
-tick: Tick,
-tick_current: Tick,
-liquidity_delta: i128,
-fee_growth_global: FeeGrowth,
-seconds_per_liquidity_cumulative: SecondsOutside,
-tick_cumulative: i128,
-time: u32,
-is_upper: bool,
-max_liquidity: u128,
-) -> bool {
+
+    /// Updates a tick and returns true if the tick was flipped from initialized to uninitialized, or vice versa
+    /// # Arguments
+    ///
+    /// * `tick` The tick that will be updated
+    /// * `tick_current` The current tick
+    /// * `liquidity_delta` A new amount of liquidity to be added (subtracted) when tick is crossed from left to right (right to left)
+    /// * `fee_growth_global` The all-time global fee growth, per unit of liquidity, in token0 and token1
+    /// * `seconds_per_liquidity_cumulative` The all-time seconds per max(1, liquidity) of the pool
+    /// * `tick_cumulative`  The tick * time elapsed since the pool was first initialized
+    /// * `time` The current block timestamp cast to a uint32
+    /// * `is_upper` true for updating a position's upper tick, or false for updating a position's lower tick
+    /// * `max_liquidity` the maximum liquidity allocation for a single tick
+    ///
+    /// returns true if the tick was flipped from initialized to uninitialized, or vice versa
+    fn update(
+        &mut self,
+        tick: Tick,
+        tick_current: Tick,
+        liquidity_delta: i128,
+        fee_growth_global: Fee,
+        seconds_per_liquidity_cumulative: SecondsPerLiquidity,
+        tick_cumulative: i128,
+        time: u32,
+        is_upper: bool,
+        max_liquidity: u128,
+    ) -> Result<bool> {
         let data = self.get(tick_lower);
-// TODO implement me
-// uint128 liquidityGrossBefore = info.liquidityGross;
-// uint128 liquidityGrossAfter = LiquidityMath.addDelta(liquidityGrossBefore, liquidityDelta);
-//
-// require(liquidityGrossAfter <= maxLiquidity, 'LO');
-//
-// flipped = (liquidityGrossAfter == 0) != (liquidityGrossBefore == 0);
-//
-// if (liquidityGrossBefore == 0) {
-// // by convention, we assume that all growth before a tick was initialized happened _below_ the tick
-// if (tick <= tickCurrent) {
-// info.feeGrowthOutside0X128 = feeGrowthGlobal0X128;
-// info.feeGrowthOutside1X128 = feeGrowthGlobal1X128;
-// info.secondsPerLiquidityOutsideX128 = secondsPerLiquidityCumulativeX128;
-// info.tickCumulativeOutside = tickCumulative;
-// info.secondsOutside = time;
-// }
-// info.initialized = true;
-// }
-//
-// info.liquidityGross = liquidityGrossAfter;
-//
-// // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
-// info.liquidityNet = upper
-// ? int256(info.liquidityNet).sub(liquidityDelta).toInt128()
-// : int256(info.liquidityNet).add(liquidityDelta).toInt128();
-        false
+        let liquidity_gross_before = data.liquidity_gross;
+        // TODO: they use a library called liquiditymath here- maybe we implement that?
+        let liquidity_gross_after = liquidity_gross_before + liquidity_delta;
+        if liquidity_gross_after > max_liquidity {
+            return Err(anyhow!("LO"));
+        };
+        let flipped = (liquidity_gross_after == 0) != (liquidity_gross_before == 0);
+        if liquidity_gross_before == 0 {
+            //  by convention, we assume that all growth before a tick was initialized happened _below_ the tick
+            if tick <= tick_current {
+                data.fee_growth_outside = fee_growth_global;
+                data.seconds_per_liquidity_outside = seconds_per_liquidity_cumulative;
+                data.tick_cumulative_outside = tick_cumulative;
+                data.seconds_outside = time;
+            }
+            data.initialized = true;
+        }
+
+        data.liquidity_gross = liquidity_gross_after;
+
+        // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
+        // TODO: check math here
+
+        data.liquidity_net = if is_upper {
+            data.liquidity_net - liquidity_delta
+        } else {
+            data.liquidity_net + liquidity_delta
+        };
+        self.put(tick_lower, data);
+        Ok(flipped)
+    }
+
+    // TODO: is this even necessary?
+    // @notice Clears tick data
+    // @param self The mapping containing all initialized tick information for initialized ticks
+    // @param tick The tick that will be cleared
+    // function clear(mapping(int24 => Tick.Info) storage self, int24 tick) internal {
+    //     delete self[tick];
+    // }
+
+    /// Transitions to next tick as needed by price movement
+    /// # Arguments
+    ///
+    /// * `tick`  The destination tick of the transition
+    /// * `fee_growth_global` The all-time global fee growth, per unit of liquidity, in token0 and token1
+    /// * `seconds_per_liquidity_cumulative` The current seconds per liquidity
+    /// * `tick_cumulative`  The tick * time elapsed since the pool was first initialized
+    /// * `time` The current block.timestamp
+    ///
+    /// returns The amount of liquidity added (subtracted) when tick is crossed from left to right (right to left)
+    fn cross(
+        &mut self,
+        tick: Tick,
+        fee_growth_global: Fee,
+        seconds_per_liquidity_cumulative: SecondsPerLiquidity,
+        tick_cumulative: i128,
+        time: u32,
+    ) -> i128 {
+        let mut data = self.get(tick);
+        data.fee_growth_outside = fee_growth_global - data.fee_growth_outside;
+        data.seconds_per_liquidity_outside =
+            seconds_per_liquidity_cumulative - data.seconds_per_liquidity_outside;
+        data.tick_cumulative_outside = tick_cumulative - data.tick_cumulative_outside;
+        data.seconds_outside = time - data.seconds_outside;
+        self.put(tick, data);
+        data.liquidity_net
     }
 }
-
-// TODO: implement me
-/// @notice Clears tick data
-/// @param self The mapping containing all initialized tick information for initialized ticks
-/// @param tick The tick that will be cleared
-// function clear(mapping(int24 => Tick.Info) storage self, int24 tick) internal {
-// delete self[tick];
-// }
-
-// TODO: implement me
-/// @notice Transitions to next tick as needed by price movement
-/// @param self The mapping containing all tick information for initialized ticks
-/// @param tick The destination tick of the transition
-/// @param feeGrowthGlobal0X128 The all-time global fee growth, per unit of liquidity, in token0
-/// @param feeGrowthGlobal1X128 The all-time global fee growth, per unit of liquidity, in token1
-/// @param secondsPerLiquidityCumulativeX128 The current seconds per liquidity
-/// @param tickCumulative The tick * time elapsed since the pool was first initialized
-/// @param time The current block.timestamp
-/// @return liquidityNet The amount of liquidity added (subtracted) when tick is crossed from left to right (right to left)
-// function cross(
-// mapping(int24 => Tick.Info) storage self,
-// int24 tick,
-// uint256 feeGrowthGlobal0X128,
-// uint256 feeGrowthGlobal1X128,
-// uint160 secondsPerLiquidityCumulativeX128,
-// int56 tickCumulative,
-// uint32 time
-// ) internal returns (int128 liquidityNet) {
-// Tick.Info storage info = self[tick];
-// info.feeGrowthOutside0X128 = feeGrowthGlobal0X128 - info.feeGrowthOutside0X128;
-// info.feeGrowthOutside1X128 = feeGrowthGlobal1X128 - info.feeGrowthOutside1X128;
-// info.secondsPerLiquidityOutsideX128 = secondsPerLiquidityCumulativeX128 - info.secondsPerLiquidityOutsideX128;
-// info.tickCumulativeOutside = tickCumulative - info.tickCumulativeOutside;
-// info.secondsOutside = time - info.secondsOutside;
-// liquidityNet = info.liquidityNet;
-// }
-// }
