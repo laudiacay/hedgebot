@@ -1,18 +1,19 @@
+use num_rational::BigRational;
 use std::ops::{Add, Sub};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Fee {
-    token_0: f64, // technically wrong datatype
-    token_1: f64, // technically wrong datatype
+    token_0: BigRational,
+    token_1: BigRational,
 }
 impl Fee {
-    pub(crate) fn new(token_0: f64, token_1: f64) -> Self {
+    pub(crate) fn new(token_0: BigRational, token_1: BigRational) -> Self {
         Self { token_0, token_1 }
     }
     pub(crate) fn zero() -> Self {
         Self {
-            token_0: 0.0,
-            token_1: 0.0,
+            token_0: BigRational::zero(),
+            token_1: BigRational::zero(),
         }
     }
 }
