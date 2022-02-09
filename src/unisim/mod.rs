@@ -164,12 +164,10 @@ impl UniV3PoolSimulator {
             {
                 Err(anyhow!("SPL"))?
             }
-        } else {
-            if !(sqrt_price_limit > slot0Start.sqrt_price
-                && sqrt_price_limit < TickMath.MAX_SQRT_RATIO)
-            {
-                Err(anyhow!("SPL"))?
-            }
+        } else if !(sqrt_price_limit > slot0Start.sqrt_price
+            && sqrt_price_limit < TickMath.MAX_SQRT_RATIO)
+        {
+            Err(anyhow!("SPL"))?
         };
 
         let mut cache = SwapCache {
@@ -254,12 +252,11 @@ impl UniV3PoolSimulator {
             );
 
             if exactInput {
-                state.amount_specified_remaining -= (step.amount_in + step.fee_amount);
-                state.amount_calculated = state.amount_calculated - step.amount_out;
+                state.amount_specified_remaining -= step.amount_in + step.fee_amount;
+                state.amount_calculated -= step.amount_out;
             } else {
                 state.amount_specified_remaining += step.amount_out.toInt256();
-                state.amount_calculated =
-                    state.amount_calculated + (step.amount_in + step.fee_amount);
+                state.amount_calculated += step.amount_in + step.fee_amount;
             }
 
             // if the protocol fee is on, calculate how much is owed, decrement feeAmount, and increment protocolFee
@@ -370,13 +367,13 @@ impl UniV3PoolSimulator {
                 protocolFees.token0 += state.protocol_fee
             };
         } else {
-            feeGrowthGlobal1X128 = state.fee_growth_global;
+            fee_growth_global1 = state.fee_growth_global;
             if state.protocol_fee.is_positive() {
                 protocolFees.token1 += state.protocol_fee
             };
         }
 
-        let (amount0, amount1) = if zero_for_one == exactInput {
+        let (amount_0, amount_1) = if zero_for_one == exactInput {
             (
                 amountSpecified - state.amount_specified_remaining,
                 state.amount_calculated,
@@ -390,29 +387,29 @@ impl UniV3PoolSimulator {
 
         // do the transfers and collect payment
         if zero_for_one {
-            if amount1.is_negative() {
-                // TransferHelper.safeTransfer(token1, recipient, uint256(-amount1))
+            if amount_1.is_negative() {
+                // TransferHelper.safeTransfer(token1, recipient, uint256(-amount_1))
                 self.balance_1 -= amount_1;
             };
 
             let balance_0_before = balance0();
-            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount0, amount1, data);
-            if !(balance_0_before.add(uint256(amount0)) <= balance0()) {
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount_0, amount_1, data);
+            if !(balance_0_before.add(uint256(amount_0)) <= balance0()) {
                 Err(anyhow!("IIA"))?
             }
         } else {
-            if amount0.is_negative() {
-                // TransferHelper.safeTransfer(token0, recipient, uint256(-amount0))
+            if amount_0.is_negative() {
+                // TransferHelper.safeTransfer(token0, recipient, uint256(-amount_0))
                 self.balance_0 -= amount_0;
             };
 
             let balance_1_before = balance1();
-            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount0, amount1, data);
-            if !(balance_1_before + amount1) <= balance1() {
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount_0, amount_1, data);
+            if !(balance_1_before + amount_1) <= balance1() {
                 Err(anyhow!("IIA"))?
             }
         }
 
-        Ok(amount0, amount1)
+        Ok(amount_0, amount_1)
     }
 }

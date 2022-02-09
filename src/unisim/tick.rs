@@ -122,28 +122,40 @@ fn update(
     };
     let flipped = (liquidity_gross_after == 0) != (liquidity_gross_before == 0);
 
+    let mut fee_growth_outside = info.fee_growth_outside;
+    let mut seconds_per_liquidity_outside = info.seconds_per_liquidity_outside.to_owned();
+    let mut tick_cumulative_outside = info.tick_cumulative_outside;
+    let mut seconds_outside = info.seconds_outside.to_owned();
+    let mut initialized = info.initialized;
+
     if liquidity_gross_before == 0 {
         //  by convention, we assume that all growth before a tick was initialized happened _below_ the tick
         if tick <= tick_current {
-            info.fee_growth_outside = fee_growth_global;
-            info.seconds_per_liquidity_outside = seconds_per_liquidity_cumulative;
-            info.tick_cumulative_outside = tick_cumulative;
-            info.seconds_outside = time;
+            fee_growth_outside = fee_growth_global;
+            seconds_per_liquidity_outside = seconds_per_liquidity_cumulative;
+            tick_cumulative_outside = tick_cumulative;
+            seconds_outside = time;
         }
-        info.initialized = true;
+        initialized = true;
     }
 
-    info.liquidity_gross = liquidity_gross_after;
-
-    // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
-    // TODO: check math here
-
-    info.liquidity_net = if is_upper {
-        info.liquidity_net - liquidity_delta
-    } else {
-        info.liquidity_net + liquidity_delta
+    let new_info = TickData {
+        fee_growth_outside,
+        seconds_per_liquidity_outside,
+        tick_cumulative_outside,
+        seconds_outside,
+        initialized,
+        liquidity_gross: liquidity_gross_after,
+        // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
+        // TODO: check math here
+        liquidity_net: if is_upper {
+            info.liquidity_net.to_owned() - liquidity_delta
+        } else {
+            info.liquidity_net.to_owned() + liquidity_delta
+        },
     };
-    table.insert(tick_lower, *info);
+
+    table.insert(tick_lower, *new_info);
     Ok(flipped)
 }
 
@@ -175,12 +187,12 @@ fn cross(
 ) -> Result<BigInt> {
     let info = table.get(tick.borrow()).ok_or(anyhow!("tick not found"))?;
     let new_info = TickInfo {
-        fee_growth_outside: fee_growth_global - info.fee_growth_outside,
+        fee_growth_outside: fee_growth_global - info.fee_growth_outside.clone(),
         seconds_per_liquidity_outside: seconds_per_liquidity_cumulative
-            - info.seconds_per_liquidity_outside,
-        tick_cumulative_outside: tick_cumulative - info.tick_cumulative_outside,
-        seconds_outside: time - info.seconds_outside,
-        ..*info
+            - info.seconds_per_liquidity_outside.clone(),
+        tick_cumulative_outside: tick_cumulative - info.tick_cumulative_outside.clone(),
+        seconds_outside: time - info.seconds_outside.clone(),
+        ..*info.clone()
     };
     table.insert(tick, new_info);
     Ok(new_info.liquidity_net.clone())
