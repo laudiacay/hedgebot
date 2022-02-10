@@ -177,7 +177,7 @@ fn update(
 /// * `time` The current block.timestamp
 ///
 /// returns The amount of liquidity added (subtracted) when tick is crossed from left to right (right to left)
-fn cross(
+pub(crate) fn cross(
     table: &mut TickTable,
     tick: Tick,
     fee_growth_global: Fee,

@@ -35,12 +35,10 @@ struct UniV3Pool {
     gamma_percent_fee: u32,
     phi_percent_fee: u32,
     tick_chart: TickTable,
+    // all the positions
     positions: HashMap<PositionID, Position>,
+    // just my positions (to calculate gains/losses)
     my_positions: HashSet<PositionID>,
-    // the most-recently updated index of the observations array
-    observation_index: u16,
-    // the current maximum number of observations that are being stored
-    observation_cardinality: u16,
     // pool balance of token 0
     balance_0: BigRational,
     // pool balance of token 1
@@ -97,10 +95,6 @@ struct SwapCache {
     block_timestamp: u32,
     // the current value of the tick accumulator, computed only if we cross an initialized tick
     tick_cumulative: i64,
-    // the current value of seconds per liquidity accumulator, computed only if we cross an initialized tick
-    seconds_per_liquidity_cumulative: BigUint,
-    // whether we've computed and cached the above two accumulators
-    computed_latest_observation: bool,
 }
 
 // the top level state of the swap, the results of which are recorded in storage at the end
@@ -179,8 +173,6 @@ impl UniV3PoolSimulator {
             } else {
                 slot0Start.feeProtocol >> 4
             },
-            seconds_per_liquidity_cumulative: BigUint::zero(),
-            computed_latest_observation: false,
         };
 
         let exact_input = amount_specified.greater_than(BigInt::zero());
@@ -251,7 +243,7 @@ impl UniV3PoolSimulator {
                 fee,
             );
 
-            if exactInput {
+            if exact_input {
                 state.amount_specified_remaining -= step.amount_in + step.fee_amount;
                 state.amount_calculated -= step.amount_out;
             } else {
@@ -278,33 +270,21 @@ impl UniV3PoolSimulator {
                 if step.initialized {
                     // check for the placeholder value, which we replace with the actual value the first time the swap
                     // crosses an initialized tick
-                    if !cache.computed_latest_observation {
-                        (
-                            cache.tick_cumulative,
-                            cache.seconds_per_liquidity_cumulative,
-                        ) = observations.observeSingle(
-                            cache.block_timestamp,
-                            0,
-                            slot0Start.tick,
-                            slot0Start.observation_index,
-                            cache.liquidity_start,
-                            slot0Start.observation_cardinality,
-                        );
-                        cache.computed_latest_observation = true;
-                    }
-                    let liquidity_net = ticks.cross(
+                    let mut liquidity_net = tick::cross(
+                        self.tick_chart,
                         step.tick_next,
                         if zero_for_one {
-                            state.fee_growth_global
+                            Fee {
+                                token_0: state.fee_growth_global.token_0,
+                                token_1: fee_growth_global.token_1,
+                            }
                         } else {
-                            feeGrowthGlobal0X128
+                            Fee {
+                                token_0: fee_growth_global.token_0,
+                                token_1: state.fee_growth_global.token_1,
+                            }
                         },
-                        if zero_for_one {
-                            fee_growth_global1
-                        } else {
-                            state.fee_growth_global
-                        },
-                        cache.seconds_per_liquidity_cumulative,
+                        cache.seconds_per_liquidity_cumulative.clone(),
                         cache.tick_cumulative,
                         cache.block_timestamp,
                     );
@@ -314,7 +294,8 @@ impl UniV3PoolSimulator {
                         liquidity_net = -liquidity_net
                     };
 
-                    state.liquidity = LiquidityMath.addDelta(state.liquidity, liquidity_net);
+                    state.liquidity =
+                        LiquidityMath.addDelta(state.liquidity.clone(), liquidity_net);
                 }
 
                 state.tick = if zero_for_one {
@@ -328,27 +309,9 @@ impl UniV3PoolSimulator {
             }
         }
 
-        // update tick and write an oracle entry if the tick change
+        // update tick if the tick change
         if state.tick != slot0Start.tick {
-            let (observation_index, observation_cardinality) = observations.write(
-                slot0Start.observation_index,
-                cache.block_timestamp,
-                slot0Start.tick,
-                cache.liquidity_start,
-                slot0Start.observation_cardinality,
-                slot0Start.observationCardinalityNext,
-            );
-            (
-                self.sqrt_price,
-                self.tick,
-                self.observation_index,
-                self.observation_cardinality,
-            ) = (
-                state.sqrt_price,
-                state.tick,
-                observation_index,
-                observation_cardinality,
-            );
+            (self.sqrt_price, self.tick) = (state.sqrt_price, state.tick);
         } else {
             // otherwise just update the price
             self.sqrt_price = state.sqrt_price;
@@ -356,7 +319,7 @@ impl UniV3PoolSimulator {
 
         // update liquidity if it changed
         if cache.liquidity_start != state.liquidity {
-            liquidity = state.liquidity
+            liquidity = state.liquidity.clone()
         };
 
         // update fee growth global and, if necessary, protocol fees
@@ -373,7 +336,7 @@ impl UniV3PoolSimulator {
             };
         }
 
-        let (amount_0, amount_1) = if zero_for_one == exactInput {
+        let (amount_0, amount_1) = if zero_for_one == exact_input {
             (
                 amountSpecified - state.amount_specified_remaining,
                 state.amount_calculated,
@@ -410,6 +373,6 @@ impl UniV3PoolSimulator {
             }
         }
 
-        Ok(amount_0, amount_1)
+        Ok((amount_0, amount_1))
     }
 }

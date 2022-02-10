@@ -3,8 +3,8 @@ use std::ops::{Add, Sub};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Fee {
-    token_0: BigRational,
-    token_1: BigRational,
+    pub(crate) token_0: BigRational,
+    pub(crate) token_1: BigRational,
 }
 impl Fee {
     pub(crate) fn new(token_0: BigRational, token_1: BigRational) -> Self {
