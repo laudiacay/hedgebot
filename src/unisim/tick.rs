@@ -1,7 +1,7 @@
 use super::fee::Fee;
 use anyhow::{anyhow, Result};
-use num_bigint::{BigInt, BigUint};
-use num_rational::BigRational;
+
+use super::liq_math;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
@@ -13,9 +13,9 @@ pub(crate) const MAX_TICK: i32 = -MIN_TICK;
 /// One tick's data, as stored in the tick table. For all sorts of dynamic programming goodies.
 pub struct TickInfo {
     /// the total position liquidity that references this tick
-    liquidity_gross: BigUint,
+    liquidity_gross: u128,
     /// amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
-    liquidity_net: BigInt,
+    liquidity_net: u128,
     /// fee growth per unit of liquidity on the _other_ side of this tick (relative to the current tick)
     /// only has relative meaning, not absolute — the value depends on when the tick is initialized
     fee_growth_outside: Fee,
@@ -23,7 +23,7 @@ pub struct TickInfo {
     tick_cumulative_outside: i64,
     /// the seconds per unit of liquidity on the _other_ side of this tick (relative to the current tick)
     /// only has relative meaning, not absolute — the value depends on when the tick is initialized
-    seconds_per_liquidity_outside: BigRational,
+    seconds_per_liquidity_outside: f64,
     /// the seconds spent on the other side of the tick (relative to the current tick)
     /// only has relative meaning, not absolute — the value depends on when the tick is initialized
     seconds_outside: u32,
@@ -39,14 +39,13 @@ pub struct TickInfo {
 ///     e.g., a tickSpacing of 3 requires ticks to be initialized every 3rd tick i.e., ..., -6, -3, 0, 3, 6, ...
 /// returns the max liquidity per tick
 /// TODO: this is incorrect due to int type things! check it.
-fn tick_spacing_to_max_liquidity_per_tick(tick_spacing: i32) -> u128 {
-    let min_tick = (MIN_TICK / tick_spacing) * tick_spacing;
-    let max_tick = (MAX_TICK / tick_spacing) * tick_spacing;
-    let num_ticks = ((max_tick - min_tick) / tick_spacing) + 1;
-    return u128::MAX_INT / num_ticks;
-}
-
-type TickTable = HashMap<Tick, TickInfo>;
+// fn tick_spacing_to_max_liquidity_per_tick(tick_spacing: i32) -> u128 {
+//     let min_tick = (MIN_TICK / tick_spacing) * tick_spacing;
+//     let max_tick = (MAX_TICK / tick_spacing) * tick_spacing;
+//     let num_ticks = ((max_tick - min_tick) / tick_spacing) + 1;
+//     return u128::MAX / num_ticks;
+// }
+pub type TickTable = HashMap<Tick, TickInfo>;
 
 /// Retrieves fee growth data
 /// # Arguments
@@ -107,56 +106,48 @@ fn update(
     tick_current: Tick,
     liquidity_delta: i128,
     fee_growth_global: Fee,
-    seconds_per_liquidity_cumulative: SecondsPerLiquidity,
+    seconds_per_liquidity_cumulative: f64,
     tick_cumulative: i64,
     time: u32,
     is_upper: bool,
     max_liquidity: u128,
 ) -> Result<bool> {
-    let info = table.get(tick.borrow()).ok_or(anyhow!("tick not found"))?;
-    let liquidity_gross_before = data.liquidity_gross;
+    let mut new_info = table.get(&tick).ok_or(anyhow!("tick not found"))?.clone();
+    let liquidity_gross_before = new_info.liquidity_gross;
     // TODO: they use a library called liquiditymath here- maybe we implement that?
-    let liquidity_gross_after = liquidity_gross_before + liquidity_delta;
+    let liquidity_gross_after = liq_math::addDelta(liquidity_gross_before, liquidity_delta)?;
     if liquidity_gross_after > max_liquidity {
         return Err(anyhow!("LO"));
     };
     let flipped = (liquidity_gross_after == 0) != (liquidity_gross_before == 0);
 
-    let mut fee_growth_outside = info.fee_growth_outside;
-    let mut seconds_per_liquidity_outside = info.seconds_per_liquidity_outside.to_owned();
-    let mut tick_cumulative_outside = info.tick_cumulative_outside;
-    let mut seconds_outside = info.seconds_outside.to_owned();
-    let mut initialized = info.initialized;
-
     if liquidity_gross_before == 0 {
         //  by convention, we assume that all growth before a tick was initialized happened _below_ the tick
         if tick <= tick_current {
-            fee_growth_outside = fee_growth_global;
-            seconds_per_liquidity_outside = seconds_per_liquidity_cumulative;
-            tick_cumulative_outside = tick_cumulative;
-            seconds_outside = time;
+            new_info.fee_growth_outside = fee_growth_global;
+            new_info.seconds_per_liquidity_outside = seconds_per_liquidity_cumulative;
+            new_info.tick_cumulative_outside = tick_cumulative;
+            new_info.seconds_outside = time;
         }
-        initialized = true;
+        new_info.initialized = true;
     }
 
-    let new_info = TickData {
-        fee_growth_outside,
-        seconds_per_liquidity_outside,
-        tick_cumulative_outside,
-        seconds_outside,
-        initialized,
-        liquidity_gross: liquidity_gross_after,
-        // when the lower (upper) tick is crossed left to right (right to left), liquidity must be added (removed)
-        // TODO: check math here
-        liquidity_net: if is_upper {
-            info.liquidity_net.to_owned() - liquidity_delta
-        } else {
-            info.liquidity_net.to_owned() + liquidity_delta
-        },
-    };
+    new_info.liquidity_gross = liquidity_gross_after;
 
-    table.insert(tick_lower, *new_info);
+    // FIXME i think this math here might be wrong!
+    new_info.liquidity_net = if is_upper {
+        liq_math::addDelta(new_info.liquidity_net.to_owned(), -liquidity_delta)
+    } else {
+        liq_math::addDelta(new_info.liquidity_net.to_owned(), liquidity_delta)
+    }?;
+
+    table.insert(tick, *new_info);
+
     Ok(flipped)
+}
+
+pub fn tick_from_sqrt_price(sqrt_price: f64) -> u32 {
+    unimplemented!("need to do this lol")
 }
 
 // TODO: is this even necessary?
@@ -181,10 +172,10 @@ pub(crate) fn cross(
     table: &mut TickTable,
     tick: Tick,
     fee_growth_global: Fee,
-    seconds_per_liquidity_cumulative: SecondsPerLiquidity,
+    seconds_per_liquidity_cumulative: f64,
     tick_cumulative: i64,
     time: u32,
-) -> Result<BigInt> {
+) -> Result<u128> {
     let info = table.get(tick.borrow()).ok_or(anyhow!("tick not found"))?;
     let new_info = TickInfo {
         fee_growth_outside: fee_growth_global - info.fee_growth_outside.clone(),

@@ -1,19 +1,18 @@
-use num_rational::BigRational;
 use std::ops::{Add, Sub};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Default)]
 pub struct Fee {
-    pub(crate) token_0: BigRational,
-    pub(crate) token_1: BigRational,
+    pub(crate) token_0: f64,
+    pub(crate) token_1: f64,
 }
 impl Fee {
-    pub(crate) fn new(token_0: BigRational, token_1: BigRational) -> Self {
+    pub(crate) fn new(token_0: f64, token_1: f64) -> Self {
         Self { token_0, token_1 }
     }
     pub(crate) fn zero() -> Self {
         Self {
-            token_0: BigRational::zero(),
-            token_1: BigRational::zero(),
+            token_0: 0.0,
+            token_1: 0.0,
         }
     }
 }

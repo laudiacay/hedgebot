@@ -21,6 +21,7 @@ dependencies = [
  "anyhow",
  "num-bigint",
  "num-rational",
+ "num-traits",
 ]
 
 [[package]]

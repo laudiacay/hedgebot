@@ -1,212 +1,189 @@
 mod fee;
+mod liq_math;
+mod sqrt_price_math;
+mod swap_math;
 mod tick;
 
 use crate::unisim::fee::Fee;
 use anyhow::{anyhow, Result};
-use num_bigint::{BigInt, BigUint};
-use num_rational::BigRational;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use tick::*;
 
 type Address = String; // lmao, for now
 
 struct PositionID {
-    address: String,
+    address: Address,
     lower_bound: Tick,
     upper_bound: Tick,
 }
 
 struct Position {
-    liquidity: BigInt,
-    fee_growth_inside: Fee,
+    // the amount of liquidity owned by this position
+    liquidity: u128,
+    // fee growth per unit of liquidity as of the last update to liquidity or fees owed
+    fee_growth_inside_last: Fee,
+    // the fees owed to the position owner in token0/token1
+    tokensOwed0: u128,
+    tokensOwed1: u128,
 }
 
-struct UniV3Pool {
-    liquidity: BigRational,
+struct UniV3PoolMutableState {
+    // current virtual liquidity within tick
+    liquidity: f64,
     // the current price
-    sqrt_price: BigRational,
+    sqrt_price: f64,
     // the current tick
     tick: Tick,
-    tick_spacing: u32,
+    // current total fees globally
     fee_growth_global: Fee,
+    // protocol fees total accumulated
     protocol_fees: Fee,
-    // the current protocol fee as a percentage of the swap fee taken on withdrawal
-    // represented as an integer denominator (1/x)%
-    gamma_percent_fee: u32,
-    phi_percent_fee: u32,
+    // all the ticks with their info
     tick_chart: TickTable,
     // all the positions
     positions: HashMap<PositionID, Position>,
     // just my positions (to calculate gains/losses)
     my_positions: HashSet<PositionID>,
     // pool balance of token 0
-    balance_0: BigRational,
+    balance_0: f64,
     // pool balance of token 1
-    balance_1: BigRational,
+    balance_1: f64,
+}
+
+impl UniV3PoolMutableState {
+    fn new(start_price: f64) -> Self {
+        Self {
+            liquidity: 0.0,
+            sqrt_price: start_price.sqrt(),
+            tick: tick::tick_from_sqrt_price(start_price.sqrt()),
+            fee_growth_global: Fee::zero(),
+            protocol_fees: Fee::zero(),
+            tick_chart: HashMap::new(),
+            positions: HashMap::new(),
+            my_positions: HashSet::new(),
+            balance_0: 0.0,
+            balance_1: 0.0,
+        }
+    }
+}
+
+struct UniV3Pool {
+    // spacing between ticks...
+    tick_spacing: i32,
+    // the current lp fee as a percentage of the swap fee taken on withdrawal
+    // represented as an integer denominator (1/x)%
+    lp_fees: f64,
+    // fee that goes to the protocol
+    protocol_fees: f64,
+    // and the internal mutable state
+    state: RefCell<UniV3PoolMutableState>,
 }
 
 enum SwapEvent {
     SetPosition {
         position_id: PositionID,
-        delta_liquidity: BigRational,
+        delta_liquidity: f64,
     },
     Swap0to1 {
-        amount: BigRational,
+        amount: f64,
     },
     Swap1to0 {
-        amount: BigRational,
+        amount: f64,
     },
 }
 
-impl UniV3PoolSimulator {
-    pub fn new(
-        start_price: SqrtPriceUnits,
-        tick_spacing: u32,
-        gamma_percent_fee: f32,
-        phi_percent_fee: f32,
-    ) -> Self {
+impl UniV3Pool {
+    pub fn new(start_price: f64, tick_spacing: i32, lp_fees: f64, protocol_fees: f64) -> Self {
         Self {
-            liquidity: 0,
-            sqrt_price: start_price.sqrt(),
-            tick: tick_math::tick_from_price(start_price),
             tick_spacing,
-            fee_growth_global: Fee::zero(),
-            protocol_fees: Fee::zero(),
-            gamma_percent_fee,
-            tick_chart: HashMap::new(),
-            positions: HashMap::new(),
-            my_positions: HashSet::new(),
+            lp_fees,
+            protocol_fees,
+            state: RefCell::new(UniV3PoolMutableState::new(start_price)),
         }
     }
-    fn next_highest_tick(&self) -> Tick {
-        return self.tick + self.tick_spacing;
+    fn next_highest_tick(&self, tick: Tick) -> Tick {
+        return tick + self.tick_spacing;
     }
-    fn next_lowest_tick(&self) -> Tick {
-        return self.tick - self.tick_spacing;
+    fn next_lowest_tick(&self, tick: Tick) -> Tick {
+        return tick - self.tick_spacing;
     }
-}
-
-struct SwapCache {
-    // the protocol fee for the input token
-    fee_protocol: u8,
-    // liquidity at the beginning of the swap
-    liquidity_start: BigRational,
-    // the timestamp of the current block
-    block_timestamp: u32,
-    // the current value of the tick accumulator, computed only if we cross an initialized tick
-    tick_cumulative: i64,
 }
 
 // the top level state of the swap, the results of which are recorded in storage at the end
 struct SwapState {
     // the amount remaining to be swapped in/out of the input/output asset
-    amount_specified_remaining: BigRational,
+    amount_specified_remaining: f64,
     // the amount already swapped out/in of the output/input asset
-    amount_calculated: BigRational,
+    amount_calculated: f64,
     // current sqrt(price)
-    sqrt_price: SqrtPriceUnits,
+    sqrt_price: f64,
     // the tick associated with the current price
     tick: Tick,
     // the global fee growth of the input token
-    fee_growth_global: BigRational,
+    fee_growth_global: f64,
     // amount of input token paid as protocol fee
-    protocol_fee: BigRational,
+    protocol_fee: f64,
     // the current liquidity in range
-    liquidity: BigRational,
+    liquidity: f64,
 }
 
 struct StepComputations {
     // the price at the beginning of the step
-    sqrt_price_start: BigRational,
+    sqrt_price_start: f64,
     // the next tick to swap to from the current tick in the swap direction
     tick_next: Tick,
     // whether tick_next is initialized or not
     initialized: bool,
     // sqrt(price) for the next tick (1/0)
-    sqrt_price_next: BigRational,
+    sqrt_price_next: f64,
     // how much is being swapped in in this step
-    amount_in: BigRational,
+    amount_in: f64,
     // how much is being swapped out
-    amount_out: BigRational,
+    amount_out: f64,
     // how much fee is being paid in
-    fee_amount: BigRational,
+    fee_amount: f64,
 }
 
 // TODO: document me!
-impl UniV3PoolSimulator {
+impl UniV3Pool {
     pub fn set_position(&mut self, position_id: PositionID, state: Position, mine: bool) {}
-    pub fn get_my_holdings_value(&self, in_token_1: bool) -> BigInt {
-        return BigInt::zero();
+    pub fn get_my_holdings_value(&self, in_token_1: bool) -> f64 {
+        return 0.0;
     }
     pub fn get_my_fees_value(&self) -> (u128, u128) {
         (0, 0)
     }
+    pub fn mint() {}
+    pub fn burn() {}
     pub fn swap(
         &self,
         zero_for_one: bool,
-        amount_specified: BigInt,
-        sqrt_price_limit: SqrtPriceUnits,
-        block_timestamp: BigUint,
-    ) -> Result<(BigInt, BigInt)> {
-        if amount_specified == BigInt::zero() {
-            Err(anyhow!("AS"))?
-        };
-
-        if zero_for_one {
-            if !(sqrt_price_limit < slot0Start.sqrt_price
-                && sqrt_price_limit > TickMath.MIN_SQRT_RATIO)
-            {
-                Err(anyhow!("SPL"))?
-            }
-        } else if !(sqrt_price_limit > slot0Start.sqrt_price
-            && sqrt_price_limit < TickMath.MAX_SQRT_RATIO)
-        {
-            Err(anyhow!("SPL"))?
-        };
-
-        let mut cache = SwapCache {
-            liquidity_start: liquidity,
-            block_timestamp: _blockTimestamp(),
-            tick_cumulative: 0,
-            fee_protocol: if zero_for_one {
-                slot0Start.feeProtocol % 16
-            } else {
-                slot0Start.feeProtocol >> 4
-            },
-        };
-
-        let exact_input = amount_specified.greater_than(BigInt::zero());
+        amount_specified: f64,
+        sqrt_price_limit: f64,
+        block_timestamp: u32,
+    ) -> Result<(f64, f64)> {
+        let old_mutable_state = self.state.borrow();
 
         let mut state = SwapState {
-            amount_specified_remaining: amountSpecified,
-            amount_calculated: BigRational::zero(),
-            sqrt_price: slot0Start.sqrt_price,
-            tick: slot0Start.tick,
-            fee_growth_global: if zero_for_one {
-                self.fee_growth_global.token_0
-            } else {
-                self.fee_growth_global.token_1
-            },
-            protocol_fee: BigRational::zero(),
-            liquidity: cache.liquidity_start,
+            amount_specified_remaining: amount_specified,
+            amount_calculated: 0.0,
+            sqrt_price: old_mutable_state.sqrt_price,
+            tick: old_mutable_state.tick,
+            fee_growth_global: old_mutable_state.fee_growth_global,
+            protocol_fee: old_mutable_state.protocol_fees,
+            liquidity: self.state.borrow().liquidity,
         };
 
         // continue swapping as long as we haven't used the entire input/output and haven't reached the price limit
-        while !state.amount_specified_remaining.is_zero() && state.sqrt_price != sqrt_price_limit {
-            let mut step = StepComputations {
-                sqrt_price_start: BigRational::zero(),
-                tick_next: 0,
-                initialized: false,
-                sqrt_price_next: BigRational::zero(),
-                amount_in: BigRational::zero(),
-                amount_out: BigRational::zero(),
-                fee_amount: BigRational::zero(),
-            };
-
+        while state.amount_specified_remaining >= 0.0 && state.sqrt_price != sqrt_price_limit {
             step.sqrt_price_start = state.sqrt_price;
 
-            (step.tick_next, step.initialized) =
-                tickBitmap.nextInitializedTickWithinOneWord(state.tick, tickSpacing, zero_for_one);
+            let (tick_next, initialized) = tick_bitmap.nextInitializedTickWithinOneWord(
+                state.tick,
+                self.tick_spacing,
+                zero_for_one,
+            );
 
             // ensure that we do not overshoot the min/max tick, as the tick bitmap is not aware of these bounds
             if step.tick_next < tick::MIN_TICK {
@@ -219,29 +196,25 @@ impl UniV3PoolSimulator {
             step.sqrt_price_next = TickMath.getSqrtRatioAtTick(step.tick_next);
 
             // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
-            (
-                state.sqrt_price,
-                step.amount_in,
-                step.amount_out,
-                step.fee_amount,
-            ) = SwapMath.computeSwapStep(
-                state.sqrt_price,
-                {
-                    let direction = if zero_for_one {
-                        step.sqrt_price_next < sqrt_price_limit
-                    } else {
-                        step.sqrt_price_next > sqrt_price_limit
-                    };
-                    if direction {
-                        sqrt_price_limit
-                    } else {
-                        step.sqrt_price_next
-                    }
-                },
-                state.liquidity,
-                state.amount_specified_remaining,
-                fee,
-            );
+            let (state_sqrt_price, step_amount_in, step_amount_out, step_fee_amount) =
+                swap_math::compute_swap_step(
+                    state.sqrt_price,
+                    {
+                        let direction = if zero_for_one {
+                            step.sqrt_price_next < sqrt_price_limit
+                        } else {
+                            step.sqrt_price_next > sqrt_price_limit
+                        };
+                        if direction {
+                            sqrt_price_limit
+                        } else {
+                            step.sqrt_price_next
+                        }
+                    },
+                    state.liquidity,
+                    state.amount_specified_remaining,
+                    fee,
+                );
 
             if exact_input {
                 state.amount_specified_remaining -= step.amount_in + step.fee_amount;
@@ -260,8 +233,7 @@ impl UniV3PoolSimulator {
 
             // update global fee tracker
             if state.liquidity.is_positive() {
-                state.fee_growth_global +=
-                    FullMath.mulDiv(step.fee_amount, FixedPoint128.Q128, state.liquidity)
+                state.fee_growth_global += step.fee_amount.div(state.liquidity);
             };
 
             // shift tick if we reached the next price
@@ -314,7 +286,7 @@ impl UniV3PoolSimulator {
             (self.sqrt_price, self.tick) = (state.sqrt_price, state.tick);
         } else {
             // otherwise just update the price
-            self.sqrt_price = state.sqrt_price;
+            self.state.borrow().sqrt_price = state.sqrt_price;
         }
 
         // update liquidity if it changed
@@ -338,7 +310,7 @@ impl UniV3PoolSimulator {
 
         let (amount_0, amount_1) = if zero_for_one == exact_input {
             (
-                amountSpecified - state.amount_specified_remaining,
+                amount_specified - state.amount_specified_remaining,
                 state.amount_calculated,
             )
         } else {
@@ -350,6 +322,8 @@ impl UniV3PoolSimulator {
 
         // do the transfers and collect payment
         if zero_for_one {
+            self.balance_1 -= amount_1;
+            self.balance_0 += amount_0;
             if amount_1.is_negative() {
                 // TransferHelper.safeTransfer(token1, recipient, uint256(-amount_1))
                 self.balance_1 -= amount_1;
@@ -366,11 +340,7 @@ impl UniV3PoolSimulator {
                 self.balance_0 -= amount_0;
             };
 
-            let balance_1_before = balance1();
             IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(amount_0, amount_1, data);
-            if !(balance_1_before + amount_1) <= balance1() {
-                Err(anyhow!("IIA"))?
-            }
         }
 
         Ok((amount_0, amount_1))
