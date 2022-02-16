@@ -83,7 +83,10 @@ fn getNextSqrtPriceFromAmount1RoundingDown(
         Ok((sqrtPX96 as U256).add(quotient))
     } else {
         let quotient: U256 = if amount <= U160::MAX {
-            full_math::unsafeDivRoundingUp(amount << fixed_point::FP96_RESOLUTION, liquidity.into())?
+            full_math::unsafeDivRoundingUp(
+                amount << fixed_point::FP96_RESOLUTION,
+                liquidity.into(),
+            )?
         } else {
             full_math::mulDivRoundingUp(amount, *fixed_point::q96, liquidity.into())?
         };
@@ -101,12 +104,17 @@ fn getNextSqrtPriceFromAmount1RoundingDown(
 /// @param amountIn How much of token0, or token1, is being swapped in
 /// @param zeroForOne Whether the amount in is token0 or token1
 /// @return sqrtQX96 The price after adding the input amount to token0 or token1
-fn getNextSqrtPriceFromInput( sqrtPX96: U160,liquidity: u128, amountIn: U256, zeroForOne: bool) -> Result<U160> {
+fn getNextSqrtPriceFromInput(
+    sqrtPX96: U160,
+    liquidity: u128,
+    amountIn: U256,
+    zeroForOne: bool,
+) -> Result<U160> {
     ensure!(sqrtPX96 > U256::zero(), "zero price");
     ensure!(liquidity > 0, "zero liquidity");
 
     // round to make sure that we don't pass the target price
-     if zeroForOne {
+    if zeroForOne {
         getNextSqrtPriceFromAmount0RoundingUp(sqrtPX96, liquidity, amountIn, true)
     } else {
         getNextSqrtPriceFromAmount1RoundingDown(sqrtPX96, liquidity, amountIn, true)
@@ -192,9 +200,17 @@ fn getAmount1DeltaHelper(
     };
 
     if roundUp {
-        full_math::mulDivRoundingUp(liquidity.into(), sqrtRatioBX96 - sqrtRatioAX96, *fixed_point::q96)
+        full_math::mulDivRoundingUp(
+            liquidity.into(),
+            sqrtRatioBX96 - sqrtRatioAX96,
+            *fixed_point::q96,
+        )
     } else {
-        full_math::muldiv(liquidity.into(), sqrtRatioBX96 - sqrtRatioAX96, *fixed_point::q96)
+        full_math::muldiv(
+            liquidity.into(),
+            sqrtRatioBX96 - sqrtRatioAX96,
+            *fixed_point::q96,
+        )
     }
 }
 
