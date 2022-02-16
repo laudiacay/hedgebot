@@ -1,6 +1,5 @@
 mod fee;
 mod liq_math;
-mod sqrt_price_math;
 mod swap_math;
 mod tick;
 

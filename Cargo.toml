@@ -7,6 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-num-bigint = "0.4"
-num-rational = "0.4"
-num-traits = "0.2"
+primitive-types = "0.11"
+lazy_static = "1.4.0"
