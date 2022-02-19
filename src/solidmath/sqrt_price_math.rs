@@ -221,9 +221,9 @@ fn getAmount1DeltaHelper(
 /// @return amount0 Amount of token0 corresponding to the passed liquidityDelta between the two prices
 fn getAmount0Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) -> I256 {
     if liquidity < 0 {
-        -getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, uint128(-liquidity), false).toInt256()
+        -(getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false).into())
     } else {
-        getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, uint128(liquidity), true).toInt256()
+        getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true).into()
     }
 }
 
@@ -234,8 +234,8 @@ fn getAmount0Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) ->
 /// @return amount1 Amount of token1 corresponding to the passed liquidityDelta between the two prices
 fn getAmount1Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) -> I256 {
     if liquidity < 0 {
-        -getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, uint128(-liquidity), false).toInt256()
+        -(getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false).into())
     } else {
-        getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, uint128(liquidity), true).toInt256()
+        getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true).into()
     }
 }

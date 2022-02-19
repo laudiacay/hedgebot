@@ -1,5 +1,5 @@
-use super::sqrt_price_math;
-use num_bigint::BigInt;
+
+use crate::solidmath::sqrt_price_math;
 
 struct ComputeSwapStepReturn {
     sqrt_ratio_next: f64,
@@ -29,7 +29,8 @@ fn compute_swap_step(
     let exactIn = amountRemaining >= 0.0;
 
     if exactIn {
-        let amountRemainingLessFee = amountRemaining * ((1e6 - fee_pips) as f64) / 1e6; // FIXME hmm, this math seems off
+        let amountRemainingLessFee =
+            amountRemaining * ((1e6 - fee_pips) as f64) / 1e6; // FIXME hmm, this math seems off
         let amountIn = if zeroForOne {
             sqrt_price_math::getAmount0DeltaHelper(
                 sqrt_ratio_target,
@@ -57,19 +58,9 @@ fn compute_swap_step(
         };
     } else {
         amountOut = if zeroForOne {
-            sqrt_price_math::getAmount1DeltaHelper(
-                sqrt_ratio_target,
-                sqrt_ratio_current,
-                liquidity,
-                false,
-            )
+            sqrt_price_math::getAmount1DeltaHelper(sqrt_ratio_target, sqrt_ratio_current, liquidity, false)
         } else {
-            sqrt_price_math::getAmount0DeltaHelper(
-                sqrt_ratio_current,
-                sqrt_ratio_target,
-                liquidity,
-                false,
-            )
+            sqrt_price_math::getAmount0DeltaHelper(sqrt_ratio_current, sqrt_ratio_target, liquidity, false)
         };
         let sq = if -amountRemaining >= amountOut {
             sqrt_ratio_target
@@ -101,22 +92,12 @@ fn compute_swap_step(
         amountIn = if max && exactIn {
             amountIn
         } else {
-            sqrt_price_math::getAmount1DeltaHelper(
-                sqrt_ratio_current,
-                sqrtRatioNextX96,
-                liquidity,
-                true,
-            )
+            sqrt_price_math::getAmount1DeltaHelper(sqrt_ratio_current, sqrtRatioNextX96, liquidity, true)
         };
         amountOut = if max && !exactIn {
             amountOut
         } else {
-            sqrt_price_math::getAmount0DeltaHelper(
-                sqrt_ratio_current,
-                sqrtRatioNextX96,
-                liquidity,
-                false,
-            )
+            sqrt_price_math::getAmount0DeltaHelper(sqrt_ratio_current, sqrtRatioNextX96, liquidity, false)
         };
     }
 
