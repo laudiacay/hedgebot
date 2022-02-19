@@ -1,11 +1,10 @@
 use crate::solidmath::U256;
+use crate::solidmath::int_types::{I256, U160};
 use anyhow::{anyhow, ensure, Result};
 use std::ops::Add;
 
 use super::fixed_point;
 use super::full_math;
-
-pub type U160 = U256; // FIXME this is wrong. need a real int160 type lol
 
 /// @notice Gets the next sqrt price given a delta of token0
 /// @dev Always rounds up, because in the exact output case (increasing price) we need to move the price at least
@@ -221,9 +220,9 @@ fn getAmount1DeltaHelper(
 /// @return amount0 Amount of token0 corresponding to the passed liquidityDelta between the two prices
 fn getAmount0Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) -> I256 {
     if liquidity < 0 {
-        -(getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false).into())
+        -(getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false) as I256)
     } else {
-        getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true).into()
+        getAmount0DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true) as I256
     }
 }
 
@@ -234,8 +233,8 @@ fn getAmount0Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) ->
 /// @return amount1 Amount of token1 corresponding to the passed liquidityDelta between the two prices
 fn getAmount1Delta(sqrtRatioAX96: U160, sqrtRatioBX96: U160, liquidity: i128) -> I256 {
     if liquidity < 0 {
-        -(getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false).into())
+        -(getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, -liquidity as u128, false) as I256)
     } else {
-        getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true).into()
+        getAmount1DeltaHelper(sqrtRatioAX96, sqrtRatioBX96, liquidity as u128, true) as I256
     }
 }
