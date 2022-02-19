@@ -188,3 +188,11 @@ pub(crate) fn cross(
     table.insert(tick, new_info);
     Ok(new_info.liquidity_net.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        unimplemented!()
+    }
+}

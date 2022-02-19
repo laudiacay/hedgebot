@@ -21,3 +21,11 @@ pub fn addDelta(x: u128, y: i128) -> Result<u128> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        unimplemented!()
+    }
+}

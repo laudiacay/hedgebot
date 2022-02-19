@@ -1,6 +1,5 @@
 // TODO: is not doing it their way a potential source of slowness?
-
-use crate::solidmath::U256;
+use crate::solidints::U256;
 use anyhow::{anyhow, ensure, Result};
 
 pub fn mulmod(a: U256, b: U256, modulus: U256) -> Result<U256> {
@@ -35,4 +34,12 @@ pub fn unsafeDivRoundingUp(x: U256, y: U256) -> Result<U256> {
     };
     let round = remainder > U256::zero();
     Ok(x / y + (if round { 1 } else { 0 } as i8))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        unimplemented!()
+    }
 }

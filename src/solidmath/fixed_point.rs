@@ -10,3 +10,11 @@ lazy_static! {
     pub static ref q128: U256 = U256::from_big_endian(&[01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh
     pub static ref q96: U256 = U256::from_big_endian(&[01,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh #2
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        unimplemented!()
+    }
+}
