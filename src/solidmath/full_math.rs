@@ -18,16 +18,16 @@ pub fn muldiv(a: U256, b: U256, div: U256) -> Result<U256> {
     }
 }
 
-pub fn mulDivRoundingUp(a: U256, b: U256, denominator: U256) -> Result<U256> {
+pub fn mul_div_rounding_up(a: U256, b: U256, denominator: U256) -> Result<U256> {
     let result = muldiv(a, b, denominator)?;
     if mulmod(a, b, denominator)? > U256::zero() {
         ensure!(result < U256::MAX, "result overflowed");
-        return Ok(result + 1 as i8);
+        return Ok(result + 1_i8);
     }
     Ok(result)
 }
 
-pub fn unsafeDivRoundingUp(x: U256, y: U256) -> Result<U256> {
+pub fn unsafe_div_rounding_up(x: U256, y: U256) -> Result<U256> {
     let remainder = match x.checked_rem(y) {
         Some(thing) => thing,
         None => Err(anyhow!("denominator was zero."))?,

@@ -1,11 +1,11 @@
-use core::ops::Mul;
 use super::U256;
+use core::ops::Mul;
 /// Implementations of integer types not available through the primitive_types crate
 use core::ops::Sub;
 use std::cmp::{Ord, Ordering};
 
 // Unsigned int with 5 x 32-bit words
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct U160(pub [u32; 5]);
 
 impl From<u128> for U160 {
@@ -22,10 +22,10 @@ impl From<u128> for U160 {
 impl U160 {
     pub const MAX: Self = U160([u32::max_value(); 5]);
     pub fn zero() -> Self {
-        U160([0;5])
+        U160([0; 5])
     }
-    pub fn is_zero(&self) -> bool { 
-        return *self == U160([0;5])
+    pub fn is_zero(&self) -> bool {
+        return *self == U160([0; 5]);
     }
 }
 
@@ -61,7 +61,7 @@ impl Sub for U160 {
         let mut ret = me.clone();
         let mut borrow: u32 = 0;
         for i in 0..5 {
-            let result: i64 = (me[i].into(): i64) - (you[i].into(): i64) - (borrow.into(): i64);
+            let result: i64 = ((me[i]) - (you[i]) - (borrow)).into();
             if result < 0 {
                 ret[i] = (result + (1 << 32)) as u32;
                 borrow = 1;
@@ -88,19 +88,21 @@ impl From<U160> for U256 {
 
 // TODO watch the endianness here
 impl TryInto<U160> for U256 {
-type Error = anyhow::Error;
-fn try_into(self) -> anyhow::Result<U160> {
-    if self > U160::MAX.into() {
-        Err(anyhow::anyhow!("U256 overflowed on conversion to U160"))
-    } else {
-        todo!()
+    type Error = anyhow::Error;
+    fn try_into(self) -> anyhow::Result<U160> {
+        if self > U160::MAX.into() {
+            Err(anyhow::anyhow!("U256 overflowed on conversion to U160"))
+        } else {
+            todo!()
+        }
     }
-}
 }
 
 impl Mul<U160> for U256 {
     type Output = U256;
-    fn mul(self, other: U160) -> Self::Output { todo!() }
+    fn mul(self, _other: U160) -> Self::Output {
+        todo!()
+    }
 }
 
 #[cfg(test)]

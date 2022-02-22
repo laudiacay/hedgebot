@@ -7,8 +7,8 @@ use primitive_types::U256;
 pub const FP96_RESOLUTION: u8 = 96;
 
 lazy_static! {
-    pub static ref q128: U256 = U256::from_big_endian(&[01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh
-    pub static ref q96: U256 = U256::from_big_endian(&[01,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh #2
+    pub static ref Q128: U256 = U256::from_big_endian(&[1,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh
+    pub static ref Q96: U256 = U256::from_big_endian(&[1,00,00,00,00,00,00,00,00,00,00,00,00]); //wow ugh #2
 }
 
 #[cfg(test)]

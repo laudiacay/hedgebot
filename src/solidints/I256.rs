@@ -7,7 +7,7 @@ use std::ops::{Add, Neg, Sub};
 pub struct I256(U256);
 
 lazy_static! {
-    pub static ref mask: U256 = U256::one() << (255.into(): U256);
+    pub static ref MASK: U256 = U256::one() << 255;
 }
 
 impl PartialOrd for I256 {
@@ -21,8 +21,8 @@ impl Ord for I256 {
         let I256(self_as_u256) = self;
         let I256(other_as_u256) = other;
 
-        let self_positive: bool = (*self_as_u256 & *mask) == U256::zero();
-        let other_positive: bool = (*other_as_u256 & *mask) == U256::zero();
+        let self_positive: bool = (*self_as_u256 & *MASK) == U256::zero();
+        let other_positive: bool = (*other_as_u256 & *MASK) == U256::zero();
 
         let positive_comparison = match (self_positive, other_positive) {
             (true, false) => return Ordering::Greater,
@@ -78,12 +78,34 @@ impl Sub for I256 {
 impl TryFrom<U256> for I256 {
     type Error = anyhow::Error;
     fn try_from(u256: U256) -> Result<I256> {
-        if (u256 & *mask) != U256::zero() {
+        if (u256 & *MASK) != U256::zero() {
             Err(anyhow!("U256 overflowed on conversion to I256"))
         } else {
             Ok(I256(u256))
         }
     }
+}
+
+impl TryFrom<I256> for U256 {
+    type Error = anyhow::Error;
+    fn try_from(i256: I256) -> Result<U256> {
+        if i256 < I256::zero() {
+            Err(anyhow!("less than zero, can't convert"))
+        } else {
+            let I256(ret) = i256;
+            Ok(ret)
+        }
+    }
+}
+
+impl I256 {
+    pub fn zero() -> Self {
+        I256(U256::zero())
+    }
+    pub fn is_zero(&self) -> bool {
+        *self == I256(U256::zero())
+    }
+    pub const MAX: Self = todo!();
 }
 
 #[cfg(test)]
