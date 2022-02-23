@@ -3,6 +3,9 @@ use anyhow::{anyhow, Result};
 use std::cmp::{Ord, Ordering};
 use std::ops::{Add, Neg, Sub};
 
+#[cfg(feature = "arbitrary")]
+use arbitrary;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct I256(U256);
 
@@ -95,6 +98,13 @@ impl TryFrom<I256> for U256 {
             let I256(ret) = i256;
             Ok(ret)
         }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary<'_> for I256 {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self(U256(<[u64; 4]>::arbitrary(u)?)))
     }
 }
 
