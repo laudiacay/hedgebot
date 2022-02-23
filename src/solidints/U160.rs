@@ -6,6 +6,7 @@ use std::cmp::{Ord, Ordering};
 
 // Unsigned int with 5 x 32-bit words
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct U160(pub [u32; 5]);
 
 impl From<u128> for U160 {

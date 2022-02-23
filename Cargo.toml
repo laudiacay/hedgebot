@@ -11,3 +11,4 @@ primitive-types = "0.11"
 lazy_static = "1.4.0"
 sled = "0.34"
 rangemap = "1.0"
+arbitrary = { version = "*", optional = true, features = ["derive"] }
