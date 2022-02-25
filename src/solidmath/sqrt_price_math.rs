@@ -41,8 +41,11 @@ pub fn get_next_sqrt_price_from_amount0_rounding_up(
             }
         }
 
-        return (full_math::unsafe_div_rounding_up(numerator1, (numerator1 / sqrt_px96).add(amount)))?
-            .try_into();
+        return (full_math::unsafe_div_rounding_up(
+            numerator1,
+            (numerator1 / sqrt_px96).add(amount),
+        ))?
+        .try_into();
     } else {
         // if the product overflows, we know the denominator underflows
         // in addition, we must check that the denominator does not underflow
@@ -52,7 +55,8 @@ pub fn get_next_sqrt_price_from_amount0_rounding_up(
             "todo better error message fdjskla"
         );
         let denominator: U256 = numerator1 - product;
-        return full_math::mul_div_rounding_up(numerator1, sqrt_px96.into(), denominator)?.try_into();
+        return full_math::mul_div_rounding_up(numerator1, sqrt_px96.into(), denominator)?
+            .try_into();
     }
 }
 
@@ -220,14 +224,22 @@ pub fn get_amount1_delta_helper(
 /// @param sqrt_ratio_bx96 Another sqrt price
 /// @param liquidity The change in liquidity for which to compute the amount0 delta
 /// @return amount0 Amount of token0 corresponding to the passed liquidityDelta between the two prices
-pub fn get_amount0_delta(sqrt_ratio_ax96: U160, sqrt_ratio_bx96: U160, liquidity: i128) -> Result<I256> {
+pub fn get_amount0_delta(
+    sqrt_ratio_ax96: U160,
+    sqrt_ratio_bx96: U160,
+    liquidity: i128,
+) -> Result<I256> {
     if liquidity < 0 {
-        Ok(
-            -(get_amount0_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, -liquidity as u128, false)?
-                .try_into()?),
-        )
+        Ok(-(get_amount0_delta_helper(
+            sqrt_ratio_ax96,
+            sqrt_ratio_bx96,
+            -liquidity as u128,
+            false,
+        )?
+        .try_into()?))
     } else {
-        get_amount0_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, liquidity as u128, true)?.try_into()
+        get_amount0_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, liquidity as u128, true)?
+            .try_into()
     }
 }
 
@@ -236,14 +248,22 @@ pub fn get_amount0_delta(sqrt_ratio_ax96: U160, sqrt_ratio_bx96: U160, liquidity
 /// @param sqrt_ratio_bx96 Another sqrt price
 /// @param liquidity The change in liquidity for which to compute the amount1 delta
 /// @return amount1 Amount of token1 corresponding to the passed liquidityDelta between the two prices
-pub fn get_amount1_delta(sqrt_ratio_ax96: U160, sqrt_ratio_bx96: U160, liquidity: i128) -> Result<I256> {
+pub fn get_amount1_delta(
+    sqrt_ratio_ax96: U160,
+    sqrt_ratio_bx96: U160,
+    liquidity: i128,
+) -> Result<I256> {
     if liquidity < 0 {
-        Ok(
-            -(get_amount1_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, -liquidity as u128, false)?
-                .try_into()?),
-        )
+        Ok(-(get_amount1_delta_helper(
+            sqrt_ratio_ax96,
+            sqrt_ratio_bx96,
+            -liquidity as u128,
+            false,
+        )?
+        .try_into()?))
     } else {
-        get_amount1_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, liquidity as u128, true)?.try_into()
+        get_amount1_delta_helper(sqrt_ratio_ax96, sqrt_ratio_bx96, liquidity as u128, true)?
+            .try_into()
     }
 }
 

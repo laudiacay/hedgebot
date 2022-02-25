@@ -5,10 +5,10 @@
 // if something's not there, we do a pass over the relevant blocks to get those events.
 
 mod talk_to_sled;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 enum Protocol {
-	UniswapV2,
-	HegicOptions,
+    UniswapV2,
+    HegicOptions,
 }
