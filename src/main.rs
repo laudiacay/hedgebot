@@ -1,12 +1,11 @@
-#[macro_use]
-extern crate lazy_static;
+// #[macro_use]
+// extern crate lazy_static;
 
-/*mod ingest_chain;
-mod solidints;
-mod solidmath;
-mod unisim;*/
+mod ingest_chain;
+mod backtester;
 
-use foundry::forge::ContractRunner;
+use forge::ContractRunner;
+use cast::*;
 fn main() {
     println!("Hello, world!");
 }

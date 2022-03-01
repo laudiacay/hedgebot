@@ -1,5 +1,5 @@
-Action {
-	ISetUniswapLiquidity()
-	ISetHegicPosition()
+enum Action {
+	ISetUniswapLiquidity(),
+	ISetHegicPosition(),
 }
 
