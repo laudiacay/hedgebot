@@ -1,11 +1,11 @@
 // #[macro_use]
 // extern crate lazy_static;
 
-mod ingest_chain;
 mod backtester;
+mod ingest_chain;
 
-use forge::ContractRunner;
 use cast::*;
+use forge::ContractRunner;
 fn main() {
     println!("Hello, world!");
 }

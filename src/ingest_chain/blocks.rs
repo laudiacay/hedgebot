@@ -52,7 +52,7 @@ impl Add<GenericRange<BlockNumber>> for Blocks {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 enum MyBlockBound {
     Included(BlockNumber),
     Excluded(BlockNumber),
@@ -64,6 +64,15 @@ impl From<Bound<&BlockNumber>> for MyBlockBound {
             Bound::Included(a) => MyBlockBound::Included(a),
             Bound::Excluded(a) => MyBlockBound::Excluded(a),
             Bound::Unbounded => panic!("block ranges are always finite...."),
+        }
+    }
+}
+
+impl From<MyBlockBound> for Bound<BlockNumber> {
+    fn from(b: MyBlockBound) -> Self {
+        match b {
+            MyBlockBound::Included(a) => Bound::Included(a),
+            MyBlockBound::Excluded(a) => Bound::Excluded(a),
         }
     }
 }
@@ -93,9 +102,21 @@ impl From<&Blocks> for StoreBlocks {
 
 impl From<StoreBlocks> for Blocks {
     // serde can eat me
-    fn from(_range: StoreBlocks) -> Blocks {
-        todo!();
-        //range.as_ref().iter().map(|generic_range| (generic_range.start_bound().into(), generic_range.end_bound().into())).collect()
+    fn from(range: StoreBlocks) -> Blocks {
+        Blocks {
+            ranges: Ranges::from(
+                range
+                    .serdeable_ranges
+                    .iter()
+                    .map(|(start, end)| {
+                        (GenericRange::<BlockNumber>::from((
+                            Bound::<BlockNumber>::from(start.clone()),
+                            Bound::<BlockNumber>::from(end.clone()),
+                        )))
+                    })
+                    .collect::<Vec<GenericRange<BlockNumber>>>(),
+            ),
+        }
     }
 }
 
