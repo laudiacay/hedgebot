@@ -54,10 +54,12 @@ impl SledHandle {
     /// opens/creates the database at the requested sled path. ensures all requested protocols are in the headers table.
     fn new(sled_path: &str) -> Result<Self> {
         let db = sled::open(sled_path)?;
+        let header_tree = db.open_tree(HEADERS_TREE_KEY)?;
+        let data_tree = db.open_tree(DATA_TREE_KEY)?;
         let handle = SledHandle {
             db,
-            header_tree: db.open_tree(HEADERS_TREE_KEY)?,
-            data_tree: db.open_tree(DATA_TREE_KEY)?,
+            header_tree,
+            data_tree,
         };
         // this should set header tree merge to be the rangemap merge
         handle.header_tree.set_merge_operator(range_merge);
@@ -90,7 +92,7 @@ impl SledHandle {
         match self.data_tree.get(bincode::serialize(&protocol)?)? {
             None => Ok(false),
             Some(ranges_bytes) => {
-                Ok(*block_range - Blocks::try_from(&ranges_bytes[..])? == Blocks::empty())
+                Ok(block_range.clone() - Blocks::try_from(&ranges_bytes[..])? == Blocks::empty())
             }
         }
     }
@@ -98,7 +100,7 @@ impl SledHandle {
     // FIXME: this is horrendous and clones absolutely everywhere. fix it.
     fn get_contiguous_time_range(
         &self,
-        protocol_filter: HashSet<Protocol>,
+        _protocol_filter: &HashSet<Protocol>,
         block_range: GenericRange<BlockNumber>,
     ) -> Result<Vec<(Timestamp, Event)>> {
         Ok(block_range
@@ -120,7 +122,7 @@ impl SledHandle {
     // FIXME this doesnt filter protocols
     pub fn get_time_range(
         &self,
-        protocol_filter: HashSet<Protocol>,
+        protocol_filter: &HashSet<Protocol>,
         block_ranges: &Blocks,
     ) -> Result<Option<Vec<(Timestamp, Event)>>> {
         // first, check real quick if anything's not on disk! then we should go get it- don't want any incomplete data.

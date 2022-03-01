@@ -9,7 +9,7 @@ use std::ops::RangeBounds;
 
 pub type BlockNumber = u64;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct Blocks {
     ranges: Ranges<BlockNumber>,
 }
@@ -24,9 +24,10 @@ impl Blocks {
         }
     }
 
+    /// clones self.ranges to create a new self
     pub fn union(&self, rhs: Blocks) -> Self {
         Blocks {
-            ranges: self.ranges.union(rhs.ranges),
+            ranges: self.ranges.clone().union(rhs.ranges),
         }
     }
 }
