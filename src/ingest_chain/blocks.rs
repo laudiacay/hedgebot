@@ -100,6 +100,7 @@ impl From<&Blocks> for StoreBlocks {
     }
 }
 
+// FIXME: why must it be this way
 impl From<StoreBlocks> for Blocks {
     // serde can eat me
     fn from(range: StoreBlocks) -> Blocks {
@@ -109,10 +110,10 @@ impl From<StoreBlocks> for Blocks {
                     .serdeable_ranges
                     .iter()
                     .map(|(start, end)| {
-                        (GenericRange::<BlockNumber>::from((
+                        GenericRange::<BlockNumber>::from((
                             Bound::<BlockNumber>::from(start.clone()),
                             Bound::<BlockNumber>::from(end.clone()),
-                        )))
+                        ))
                     })
                     .collect::<Vec<GenericRange<BlockNumber>>>(),
             ),

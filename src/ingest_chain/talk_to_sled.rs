@@ -8,8 +8,6 @@ use std::collections::HashSet;
 
 // FIXME reorg this file you degenerate
 
-// TODO turn all the from_utf8 and serde from_str bullshit into something real at some point :|
-
 fn process_single_event(
     db_out: core::result::Result<(sled::IVec, sled::IVec), sled::Error>,
 ) -> Result<(Timestamp, Event)> {
