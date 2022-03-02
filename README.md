@@ -25,3 +25,10 @@ should be able to specify rules that should be called at given spots, as if we w
 two tasks to parallelize. these are like basic legos for the rest of the system. 
 1. get a forked mainnet and deploy probably like uniswap v2, uniswap v3, and hegicv8888 to start testing against. have some kind of machine ready to test against. use foundry/forge as a library for this. have it working in a nice modular function- create_machine, set_machine_to_block, deploy_contract (returns address)... all of these probably exist directly in foundry. convenient! also figure out how to do configs. do we want to use the foundry config for this? that would be convenient :) @julian wanna do this
 2. sync the chain- or subsets of it filtered by contracts that the transaction interacts with. figure out what is a sufficient level of abstraction for storing a uniswap transaction to disk in a nice mess-with-able form. @i can start here?
+
+
+### my notes for other stuff idk
+theres a build_transaction funciton in cast
+
+### my notes for chain syncing
+so every contract that you want to talk to, you need to figure out how you want to store its events in the database in a form that can come from chain. and you need to figure out how to get that data from a transaction execution, and you need to figure out how to turn that data into a new transaction.
