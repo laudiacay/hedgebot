@@ -3,6 +3,7 @@
 
 mod backtester;
 mod ingest_chain;
+mod unitest;
 
 use cast::*;
 use forge::ContractRunner;

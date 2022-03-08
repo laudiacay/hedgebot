@@ -2,3 +2,4 @@
 // extern crate lazy_static;
 pub mod backtester;
 pub mod ingest_chain;
+pub mod unitest;

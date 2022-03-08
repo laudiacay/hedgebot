@@ -18,5 +18,16 @@ ranges = "0.3"
 serde = {version="1.0", features=["derive"]}
 bincode = "1.3.3"
 # freezing this at a commit, they're really working fast... want to limit the amount i have to suffer along with them lmao
-forge = { git = "https://github.com/gakonst/foundry", rev = "ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"}
-cast = { git = "https://github.com/gakonst/foundry", rev = "ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"}
+#forge = { git = "https://github.com/gakonst/foundry", rev = "ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"}
+#cast = { git = "https://github.com/gakonst/foundry", rev = "ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"}
+#evm-adapters = { git = "https://github.com/gakonst/foundry", rev = "ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"}
+
+# changed the rev because some part of evm-adapters was broken, lmk if this breaks new things
+forge = { git = "https://github.com/gakonst/foundry", rev = "a00c1939becf3b40f1453e330d3d9507a756d610"}
+cast = { git = "https://github.com/gakonst/foundry", rev = "a00c1939becf3b40f1453e330d3d9507a756d610"}
+evm-adapters = { git = "https://github.com/gakonst/foundry", rev = "a00c1939becf3b40f1453e330d3d9507a756d610"}
+
+ethers = { git = "https://github.com/gakonst/ethers-rs", default-features = false, features = ["solc-full"] }
+eyre = "0.6.5"
+#maybe want to freeze this as well
+sputnik = { package = "evm", git = "https://github.com/rust-blockchain/evm", default-features = false, features = ["std"] }
