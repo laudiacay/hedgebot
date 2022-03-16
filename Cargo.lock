@@ -377,7 +377,7 @@ dependencies = [
 [[package]]
 name = "cast"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/foundry?rev=ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998#ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"
+source = "git+https://github.com/gakonst/foundry?rev=a00c1939becf3b40f1453e330d3d9507a756d610#a00c1939becf3b40f1453e330d3d9507a756d610"
 dependencies = [
  "chrono 0.2.25",
  "ethers-core",
@@ -1264,7 +1264,7 @@ dependencies = [
 [[package]]
 name = "evm-adapters"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/foundry?rev=ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998#ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"
+source = "git+https://github.com/gakonst/foundry?rev=a00c1939becf3b40f1453e330d3d9507a756d610#a00c1939becf3b40f1453e330d3d9507a756d610"
 dependencies = [
  "ansi_term",
  "bytes",
@@ -1383,7 +1383,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "forge"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/foundry?rev=ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998#ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"
+source = "git+https://github.com/gakonst/foundry?rev=a00c1939becf3b40f1453e330d3d9507a756d610#a00c1939becf3b40f1453e330d3d9507a756d610"
 dependencies = [
  "ethers",
  "evm",
@@ -1417,7 +1417,7 @@ dependencies = [
 [[package]]
 name = "foundry-utils"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/foundry?rev=ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998#ddb33a2bb1eb3e3a887f17ad75b70dc9202e6998"
+source = "git+https://github.com/gakonst/foundry?rev=a00c1939becf3b40f1453e330d3d9507a756d610#a00c1939becf3b40f1453e330d3d9507a756d610"
 dependencies = [
  "ethers-addressbook",
  "ethers-core",
@@ -1671,6 +1671,10 @@ dependencies = [
  "anyhow",
  "bincode",
  "cast",
+ "ethers",
+ "evm",
+ "evm-adapters",
+ "eyre",
  "forge",
  "lazy_static",
  "ranges",

@@ -6,12 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Timestamp {
     block_number: BlockNumber,
-    // preserving my boyfriend's "code" here in a comment from when he "helped" me "work"
-    // 	hack hack hack hack hack hack hack hack hack (hellow, owrld);
-    // 	{hack ,hack hack} (hellow, world}
-    // 		if ur are a noob
-    // 		then l0l i h4xx u8:
-    // }
     tx_id: u64, // this may not work. fix it later.
 }
 

@@ -1,6 +1,13 @@
+use ethers::types::H160;
+use serde::Deserialize;
+
+use serde::Serialize;
+
+mod uniswapv3;
+
 pub trait ProtocolStorageAdapter {
 	// need to be able to take this from a txn, get the interesting data out, turn it back into a transaction to replay if needed.
-	type ProtocolInternalStoredTransaction: Serialize + Deserialize;
+	type ProtocolInternalStoredTransaction<'a>: Serialize + Deserialize<'a>;
 	// this one returns which addresses are involved in a certain contract so we can watch them!
 	fn mainnet_addresses_involved(&self) -> Vec<H160>;
 	// need to be able to figure out when a given transaction touches a given contract
